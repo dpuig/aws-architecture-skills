@@ -125,7 +125,7 @@ Controls that name another control. Breaking one of these breaks the other.
 ## Known gaps
 
 1. **No `kb_source` on any control.** The blocking finding — see
-   `knowledge-base/extracted/zt-net-candidates.yaml#blocker`.
+   `/VERIFICATION.md`.
 2. **ZT-NET-011 reserved but unauthored** (private DNS resolution); source not
    yet ingested.
 3. **ZT-NET-009 authority is thin** — an overview page with no testable

@@ -123,8 +123,7 @@ plugins/aws-architecture/
       ├── aws-solution-architect/  orchestrator, validator, retrieval
       ├── aws-zero-trust/          53 controls, 12 policies, 1 module
       └── aws-zero-downtime/       43 controls, 5 policies, 1 module
-knowledge-base/                    provenance: source manifest and extraction record
-docs/                              design notes
+knowledge-base/                    provenance: source manifest
 ```
 
 `knowledge-base/curated/` is intentionally absent — see above.

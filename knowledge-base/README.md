@@ -1,48 +1,58 @@
-# Knowledge Base Corpus
+# Knowledge Base
 
-Working area for Phase 1 ingestion. **Not a skill package** — nothing here is
+Provenance for the control catalog. **Not a skill package** — nothing here is
 loaded at runtime.
 
 ```
 knowledge-base/
-├── sources/
-│   └── manifest.yaml       # what was fetched, when, and its license disposition
-└── extracted/
-    └── *-candidates.yaml   # candidate control records awaiting Phase 1.3 review
+├── sources/manifest.yaml   what was fetched, when, and what it yielded
+└── curated/                YOUR corpus — absent by design, see below
 ```
 
-## Why this lives outside the skills
+## The three things called "the knowledge base"
 
-Three different things get confused as "the knowledge base," and they have
-different lifecycles:
+They have different lifecycles and get confused constantly:
 
 | Thing | Lives | Loaded at runtime |
 |---|---|---|
-| Upstream sources | Here, as citations + metadata | No |
-| Candidate control records | Here, until reviewed | No |
-| Distilled controls | `plugins/aws-architecture/skills/aws-zero-trust/references/*.md` | Yes, on demand |
-| Curated house KB (`kb://`) | **Does not exist yet** — see below | Via `kb_search.py` |
+| Upstream sources | `sources/manifest.yaml` — citations and fetch metadata | No |
+| Distilled controls | `plugins/aws-architecture/skills/*/references/*.md` | Yes, on demand |
+| Curated house corpus (`kb://`) | `curated/` — **does not exist yet** | Via `kb_search.py` |
 
-Extraction is an authoring-time activity. The skill never reads this directory.
-Once a candidate is reviewed and promoted into a domain reference file, the
-substance has moved and the record here is history.
+## Why `curated/` is absent
 
-## License disposition
+It is gitignored and never shipped. Two reasons:
 
-Source content is **not** mirrored into this repo. `sources/manifest.yaml` stores
-citations, fetch dates, and extracted assertions in our own words — not copies.
+1. It is per-installation. A corpus inside a distributed package would be
+   destroyed on every update.
+2. It is the only genuinely proprietary part of this system. Every control in
+   the catalog cites an `authority` (a public AWS or NIST source); **none cites
+   a `kb_source`**, the field for your organisation's own position.
 
-- NIST material is public domain and may be quoted verbatim if ever needed.
-- AWS documentation and whitepapers are copyrighted: cite and paraphrase only.
-- CIS Benchmarks restrict redistribution: do not store the PDF here.
+Point `kb_search.py` at yours:
 
-This matters because the plan contemplates distributing the skills as a plugin.
-A repo containing mirrored copyrighted documentation is a much harder thing to
-ship than one containing citations.
+```sh
+export KB_ROOT=/path/to/curated
+python3 plugins/aws-architecture/skills/aws-solution-architect/scripts/kb_search.py --build-index
+```
 
-## Status
+Documents are Markdown with frontmatter:
 
-Pilot domain: **network** (ZT-NET). Chosen per the implementation plan — it is
-the most checkable domain, so the schema meets a real validator soonest.
+```markdown
+---
+title: Deregistration delay sizing
+domain: degradation
+last_reviewed: 2026-08-15
+---
+```
 
-See `extracted/zt-net-candidates.yaml`.
+An entry earns its place only if it contains a claim that would be *unknowable*
+from outside your organisation — a measured threshold, an incident, a waiver and
+its reasoning. An entry that restates the AWS documentation in different words
+is worse than none: it inflates the coverage metric while adding nothing.
+
+## Source content is not mirrored here
+
+`sources/manifest.yaml` stores citations, fetch dates, and extracted assertions
+in our own words. AWS documentation is copyrighted and CIS Benchmarks restrict
+redistribution — see `/NOTICE`.

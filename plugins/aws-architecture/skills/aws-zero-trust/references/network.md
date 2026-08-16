@@ -1,8 +1,8 @@
 # ZT-NET — Network
 
 Segmentation, ingress and egress authorization, and service-to-service
-reachability. Promoted from `knowledge-base/extracted/zt-net-candidates.yaml`
-(extraction pass 1, 2026-08-15).
+reachability. Extracted 2026-08-15 from SRC-AWS-WAF-SEC (SEC05), SRC-AWS-LATTICE,
+SRC-AWS-MULTIVPC, and SRC-AWS-VERIFIED-ACCESS.
 
 **Catalog version: see `/CATALOG_VERSION` — pre-review.** No control in this file has `kb_source`
 set; all are grounded on `authority` alone. See SKILL.md § Catalog status.

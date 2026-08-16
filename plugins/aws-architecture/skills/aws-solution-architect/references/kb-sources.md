@@ -326,5 +326,4 @@ Per the plan's Phase 5 review-date requirement:
 5. **🔴 No curated KB exists** — so `kb_source` is unpopulated on every control
    extracted so far, and the catalog currently encodes public documentation
    only. This is the blocking finding from the network pilot; see
-   `knowledge-base/extracted/zt-net-candidates.yaml#blocker` before extending
-   ingestion to further domains.
+   `/VERIFICATION.md` before extending ingestion to further domains.
