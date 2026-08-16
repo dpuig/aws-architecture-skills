@@ -17,6 +17,8 @@ A defensible artifact has to be honest about its own gaps first.**
 | "0 of 149 controls have `kb_source`" | **96 controls**, not 149. Arithmetic error. The `kb_source` figure of 0 was correct. |
 | "19 executable policies" | **17 rule-bearing policy files** (+2 shared helper files with no rules), containing **29 individual deny rules**. |
 | Stage 5 "PASS" in validator output | Stage 5 was **never implemented**. It previously reported PASS whenever `--catalog` pointed at any file. Fixed 2026-08-15 to report SKIP unconditionally. |
+| "The plugin has never been installed" | Installed and verified 2026-08-16 — see below. Required a fix to `marketplace.json`. |
+| Stage 2 parsed every conftest result | It did not. `successes` is an **int**, and the parser iterated it, raising `TypeError` and aborting the result loop. Failures in any namespace after the first with `successes > 0` were **silently dropped**. Fixed 2026-08-16. |
 
 ```sh
 # recount controls
@@ -40,11 +42,61 @@ Verified after the move:
 | Retrieval: index build, exact-token lookup, exit 2 with no corpus | ✅ |
 | Terraform modules `validate` | ✅ |
 
-**Not verified:** the plugin has never actually been installed via
-`/plugin marketplace add`. Manifest structure was checked against the published
-plugin and marketplace reference documentation, and both files parse as JSON,
-but the install path itself is untested. The CI workflow has never run — it is
-written against GitHub Actions and has not executed anywhere.
+**Install: verified 2026-08-16.** Added as a local directory marketplace and
+installed on Claude Code 2.1.223; all three skills register and are listed.
+The install initially **failed**: the plugin entry used a bare
+`"source": "aws-architecture"` with `metadata.pluginRoot`, which that version
+does not recognise as a path source ("this plugin uses a source type your
+Claude Code version does not support"). Isolated by bisecting the two fields on
+throwaway copies — the `./`-prefixed path is what matters, `pluginRoot` is
+ignored. `marketplace.json` now uses `"source": "./plugins/aws-architecture"`.
+
+**Still not verified:** the CI workflow has never run — it is written against
+GitHub Actions and has not executed anywhere. Install has only been exercised
+from a local directory source, not from a GitHub remote.
+
+## Diagrams and Region placeholder (added 2026-08-16)
+
+`scripts/render_diagram.py` renders the planned architecture as Mermaid and
+ASCII from `plan.json`; `validate.sh` Stage 1b runs it and resolves the Region.
+
+| Check | Result |
+|---|---|
+| Renders both formats from a real plan | ✅ |
+| Mermaid `subgraph`/`end` balanced | ✅ asserted in tests |
+| No dangling Mermaid edge endpoints | ✅ asserted in tests |
+| Nested-block references resolved (ASG → launch template) | ✅ asserted in tests |
+| Placeholder Region never rendered as a bare Region name | ✅ asserted in tests |
+| `INTAKE-REGION` blocks the gate when unspecified | ✅ asserted in tests |
+| `--allow-region-placeholder` downgrades to `recommended`, not `satisfied` | ✅ asserted in tests |
+| Missing plan file exits 2 | ✅ asserted in tests |
+| `count` / `for_each` addresses rendered | ✅ `multi-instance` fixture |
+| Public subnet tier labelled from `map_public_ip_on_launch` | ✅ `multi-instance` fixture |
+| Reference to one instance ≠ reference to a collection | ✅ `multi-instance` fixture |
+| `each.key` / `count.index` not counted as unresolved | ✅ `multi-instance` fixture |
+
+Verified by construction during authoring: a fake Region *value* passes
+`terraform validate` and fails `terraform plan` with "invalid AWS Region", which
+is why the sentinel lives in the variable description and the planning value is
+a real Region.
+
+Two placement bugs were found and fixed by building that fixture, both of which
+would have misreported failure domains in the diagram — the artifact readers
+trust most:
+
+| Bug | Effect |
+|---|---|
+| A resource referencing a `for_each` collection resolved to the first instance only | An ASG across two subnets drew as single-AZ |
+| Terraform emits `x["a"].id`, `x["a"]` and `x` together; the union was taken | An instance pinned to one subnet drew as spanning the whole collection |
+
+**Not verified:** the Mermaid output has never been fed to an actual Mermaid
+renderer — the tests assert structural invariants (`subgraph`/`end` balance, no
+dangling edge endpoints), not that Mermaid accepts it. No fixture exercises
+child modules, so the cross-module reference counter and the module-prefixed
+address path in `walk_config` remain unexercised; the composed Terraform modules
+in the domain skills are the obvious case and are not covered here. Nothing
+exercises a resource whose placement is unknown at plan time, so the
+`Placement unknown at plan time` bucket has never actually been populated.
 
 ## Controls: 96 total
 

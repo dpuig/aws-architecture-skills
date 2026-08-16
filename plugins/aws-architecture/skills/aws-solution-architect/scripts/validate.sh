@@ -3,6 +3,7 @@
 # Deterministic validation gate. Staged, fails fast between stages.
 #
 #   validate.sh [terraform-dir] [--out DIR] [--catalog FILE] [--tier N]
+#                               [--allow-region-placeholder]
 #
 # Emits JSON keyed by control ID to <out>/validation.json so the repair loop in
 # SKILL.md step 5 can act on it.
@@ -30,12 +31,14 @@ TF_DIR="${1:-.}"
 OUT_DIR="artifacts"
 CATALOG=""
 TIER="0"
+ALLOW_REGION_PLACEHOLDER=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out)     OUT_DIR="$2"; shift 2 ;;
     --catalog) CATALOG="$2"; shift 2 ;;
     --tier)    TIER="$2";    shift 2 ;;
+    --allow-region-placeholder) ALLOW_REGION_PLACEHOLDER=1; shift ;;
     *)         shift ;;
   esac
 done
@@ -111,6 +114,56 @@ terraform -chdir="${TF_DIR}" show -json tf.plan > "${PLAN_JSON}" 2>/dev/null
 stage_result 1 PASS ""
 
 # ---------------------------------------------------------------------------
+# Stage 1b — Region resolution and architecture diagram
+# ---------------------------------------------------------------------------
+# Both derive from the plan that was just validated, which is the point: a
+# diagram drawn from the same artifact the gate reads cannot drift from what the
+# Terraform actually creates.
+#
+# Region is treated as a gate concern, not a formatting one. It decides AZ
+# count, service availability, and data residency — a tier-0 three-AZ design is
+# simply wrong in a two-AZ Region. So an unresolved Region means the design was
+# validated against an assumption nobody confirmed, and that is `skipped`, not a
+# pass. `--allow-region-placeholder` downgrades it to non-blocking for the
+# deliberate case of designing before the Region is chosen.
+log "Stage 1b Region and architecture diagram"
+
+RENDER="${SCRIPT_DIR}/render_diagram.py"
+
+if [[ ! -f "${RENDER}" ]]; then
+  stage_result 1b SKIP "render_diagram.py not found — no diagram, Region unverified"
+  finding 1b "INTAKE-REGION" skipped "render_diagram.py missing; Region not resolved"
+else
+  REGION_JSON="$(python3 "${RENDER}" "${PLAN_JSON}" --region-status 2>/dev/null)"
+  if [[ -z "${REGION_JSON}" ]]; then
+    stage_result 1b SKIP "could not resolve Region from plan"
+    finding 1b "INTAKE-REGION" skipped "Region could not be resolved from plan.json"
+  else
+    REGION_LABEL="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["region"])' "${REGION_JSON}")"
+    REGION_NOTE="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["note"])' "${REGION_JSON}")"
+    IS_PLACEHOLDER="$(python3 -c 'import json,sys; print("1" if json.loads(sys.argv[1])["placeholder"] else "0")' "${REGION_JSON}")"
+
+    if [[ "${IS_PLACEHOLDER}" == "1" ]]; then
+      if [[ "${ALLOW_REGION_PLACEHOLDER}" == "1" ]]; then
+        stage_result 1b WARN "Region is a placeholder (${REGION_NOTE}) — allowed by flag"
+        finding 1b "INTAKE-REGION" recommended \
+          "no Region specified: ${REGION_NOTE}. Accepted via --allow-region-placeholder; the architecture is NOT validated against a real Region."
+      else
+        stage_result 1b FAIL "no Region specified — ${REGION_NOTE}"
+        finding 1b "INTAKE-REGION" skipped \
+          "no Region specified: ${REGION_NOTE}. AZ count, service availability, and data residency are unverified. Set the Region, or re-run with --allow-region-placeholder to accept this deliberately."
+      fi
+    else
+      stage_result 1b PASS "Region ${REGION_LABEL}"
+      finding 1b "INTAKE-REGION" satisfied "Region ${REGION_LABEL} (${REGION_NOTE})"
+    fi
+  fi
+
+  python3 "${RENDER}" "${PLAN_JSON}" --format both --out "${OUT_DIR}" 2>/dev/null \
+    || log "  note: diagram rendering failed — deliverable section 3 will have no diagram"
+fi
+
+# ---------------------------------------------------------------------------
 # Stage 2 — policy-as-code
 # ---------------------------------------------------------------------------
 log "Stage 2  Policy-as-code"
@@ -148,8 +201,10 @@ for entry in results:
             cid = m.group(1) if m else "*"
             print(json.dumps({"stage": "2", "control_id": cid,
                               "state": state, "detail": msg}))
-    for item in entry.get("successes") or []:
-        pass
+    # `successes` is deliberately not turned into findings. Conftest reports it
+    # as a *count* (an int, not a list), and more importantly a policy that did
+    # not fire is not evidence that a control is satisfied — only a control
+    # record naming that specific check can establish that.
 PY
   stage_result 2 PASS ""
 fi

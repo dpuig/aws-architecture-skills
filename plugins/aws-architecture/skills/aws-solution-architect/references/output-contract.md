@@ -32,6 +32,7 @@ never omitted — absence must never be ambiguous between "nothing to report" an
 Catalog version:      3.2
 Generated:            2026-08-15
 Criticality tier:     0
+Region:               eu-west-1
 Validator:            PASS (4 iterations)
 Degraded preconditions: none
 ```
@@ -41,6 +42,18 @@ that failed — missing retrieval corpus, unpromoted catalog, absent validator
 tooling. If the output was produced against unreviewed candidate records, it
 says so here, in the first thing the reader sees.
 
+`Region` states where the architecture was validated to run. When the brief
+never specified one, it renders as a placeholder and says so in the same line:
+
+```
+Region:               ⚠ NOT SPECIFIED — planned against us-east-1 as a placeholder
+```
+
+This is never rendered as a bare Region name. A reader who sees `us-east-1`
+here must be able to trust that someone chose it. See §7 for the gate behaviour
+and `intake-schema.md` for why the placeholder is a real Region rather than a
+sentinel string.
+
 ## 2. Intake summary
 
 The normalized brief, plus **assumptions rendered prominently**. Assumptions are
@@ -49,9 +62,40 @@ who disagrees with an assumption can stop reading, which saves them time.
 
 ## 3. Architecture
 
-Prose plus a diagram if it helps. Name the trust boundaries and the failure
-domains explicitly — those are what the control matrix refers to, and a matrix
-whose subjects are undefined cannot be audited.
+Prose **plus both generated diagrams**. Name the trust boundaries and the
+failure domains explicitly — those are what the control matrix refers to, and a
+matrix whose subjects are undefined cannot be audited.
+
+The diagrams are not decoration and they are not optional. They come from
+`scripts/render_diagram.py`, which projects `plan.json` — the same artifact the
+gate asserts against — so the picture and the control matrix describe the same
+infrastructure by construction. Full rules in `references/diagrams.md`.
+
+```
+### Architecture diagram (generated)
+
+<contents of artifacts/architecture.mmd, in a ```mermaid fence>
+
+<contents of artifacts/architecture.txt, in a plain fence>
+```
+
+Both formats, always. Mermaid renders; ASCII survives a paste into a ticket and
+diffs line-by-line between runs, which is how an unintended topology change gets
+noticed in review.
+
+Rules that carry into this section:
+
+- **Never hand-draw the primary diagram.** If rendering failed, say so and leave
+  the section without one. A hand-drawn diagram presented where a generated one
+  belongs is an unverified claim in the most trusted position in the document.
+- **Anything not in the Terraform goes in a separate, labelled context diagram**
+  — on-prem networks, SaaS consumers, an existing TGW. One merged picture where
+  the reader cannot tell verified from imagined defeats the purpose.
+- **Keep the provenance footer.** Resource count, unplaced count, unresolved
+  references, and Region placeholder status are part of the diagram.
+- Resources under *Placement unknown at plan time* are discussed in the prose,
+  not quietly ignored. They are the parts of the design the plan could not pin
+  down.
 
 ## 4. Terraform
 
@@ -124,11 +168,20 @@ The validator's JSON, summarized:
 
 ```
 Stage 1  Terraform syntax and plan      PASS
+Stage 1b Region and diagram             PASS   (eu-west-1; 2 diagrams written)
 Stage 2  Policy-as-code                 PASS   (14 rules, 0 violations)
 Stage 3  IAM analysis                   SKIP   ⚠ no credentials — 3 controls unverified
 Stage 4  Zero-downtime invariants       PASS   (6 assertions)
 Stage 5  Output contract                PASS
 ```
+
+Stage 1b reports the pseudo-control `INTAKE-REGION`. When no Region was
+specified it is `skipped`, which blocks the gate exactly as a failure does —
+AZ count, service availability, and data residency are all Region-dependent, so
+a design validated against an unchosen Region is a design validated against an
+assumption nobody made. `--allow-region-placeholder` downgrades it to
+`recommended` for the legitimate case of designing before the Region is picked;
+the deliverable still carries the warning in its header.
 
 Skips are surfaced with their consequence, never as quiet passes. Attach the
 raw JSON so the result is reproducible.

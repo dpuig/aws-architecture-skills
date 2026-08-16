@@ -39,7 +39,8 @@ account_model: unknown                         # required — see below
 landing_zone: unknown                          # control-tower | lza | custom
                                                #   | none | unknown
 existing_network: unknown                      # greenfield | extends-existing
-regions: []                                    # required — [] means ask
+regions: []                                    # required — [] means ask, then
+                                               #   placeholder; see field notes
 iac_language: terraform                        # terraform | cdk | cloudformation
 will_be_applied: false                         # required — see below
 
@@ -99,6 +100,52 @@ no execution. This removes an entire class of security requirements from the
 generator itself. If a user asks for `true`, the answer is still that this skill
 does not apply IaC — the flag exists so the deliverable can say who will, and
 so the plan can be written for a human-gated pipeline rather than a direct run.
+
+**`regions`** — required, and the field users most often leave implicit because
+the answer feels obvious to them. Ask for it in the batched question set. If it
+comes back unanswered, **do not stop and do not silently pick one**: emit the
+architecture with a labelled placeholder, and tell the user plainly.
+
+The placeholder is a *real, plannable Region carried in a variable whose
+description holds the sentinel* `REGION-PLACEHOLDER`:
+
+```hcl
+variable "aws_region" {
+  description = "Deployment Region. REGION-PLACEHOLDER: not specified in the brief; planning value only."
+  type        = string
+  default     = "us-east-1"
+}
+```
+
+The sentinel goes in the description rather than the value for a mechanical
+reason worth knowing: a fake Region string such as `"REGION-UNSPECIFIED"` passes
+`terraform validate` and then fails `terraform plan` with *invalid AWS Region*.
+That kills Stage 1, and with it the plan every later stage reads — the user
+would get no architecture at all instead of an architecture with an open
+question. The placeholder has to plan cleanly and be loudly labelled.
+
+Consequences, all three of which must hold together:
+
+| Where | What happens |
+|---|---|
+| Terraform | Plans and validates normally against the placeholder value |
+| Validator | Stage 1b reports `INTAKE-REGION` as `skipped` — **the gate stays shut** |
+| Deliverable | Header reads `⚠ NOT SPECIFIED`; diagram renders `<REGION UNSPECIFIED>` |
+
+Blocking is deliberate. Region determines how many AZs exist, which services are
+available, and where the data physically sits — a tier-0 three-AZ design is
+simply wrong in a two-AZ Region, and a `data_residency` constraint cannot be
+checked against a Region nobody chose. Designing before that decision is a
+legitimate thing to do; recording it as validated is not.
+
+When the user genuinely wants to defer, they say so and the run uses
+`validate.sh --allow-region-placeholder`, which downgrades `INTAKE-REGION` to
+`recommended`. The header warning stays either way.
+
+Record it as an assumption too, naming the placeholder value — the assumptions
+list is what a reader challenges, and "we planned this against us-east-1
+because you never said" is exactly the kind of premise that should be easy to
+find and cheap to correct.
 
 **`exposure`** and **`consumers`** together drive most ZT-NET applicability.
 `public-internet` + `human-users` pulls in Verified Access and edge controls;

@@ -34,6 +34,57 @@ requires evidence**:
 - A check that could not run (missing tool, absent credentials) is reported
   `skipped`, never `satisfied`, and blocks the gate exactly as a failure does.
 - Every control cites the upstream source that justifies it.
+- **The architecture diagram is generated from the validated plan**, never drawn
+  from intent — so the picture and the control matrix cannot describe different
+  infrastructure.
+
+## Diagrams
+
+Every deliverable carries a visual representation of the architecture, in both
+Mermaid and ASCII, rendered by `render_diagram.py` from the same `plan.json`
+the gate asserts against:
+
+```sh
+skills/aws-solution-architect/scripts/render_diagram.py artifacts/plan.json --format both
+```
+
+Nesting is the notation: Region → VPC → AZ → subnet → resources, so trust
+boundaries and failure domains are structural rather than annotated. Placement
+is read from explicit plan references only — a resource whose subnet is not
+known until apply lands in an explicit *Placement unknown at plan time* group
+rather than being tidied into a box it might not belong to. Subnet tier is
+`public`, `private`, or `tier unknown`; it is never assumed, because a subnet
+mislabelled private in a diagram is a security claim that gets believed for
+years.
+
+Both formats ship because they do different jobs: Mermaid renders, and ASCII
+survives being pasted into a ticket and diffs line-by-line between runs, which
+is how an unintended topology change gets caught in review. Rules in
+`skills/aws-solution-architect/references/diagrams.md`.
+
+## Region
+
+If the brief never says where the system runs, the generator does not stop and
+does not quietly pick one. It emits the architecture against a labelled
+placeholder, tells you, and **the gate stays shut**:
+
+```
+Region:  ⚠ NOT SPECIFIED — planned against us-east-1 as a placeholder
+```
+
+Stage 1b reports `INTAKE-REGION` as `skipped`, which blocks exactly as a failure
+does. Region decides AZ count, service availability, and data residency — a
+tier-0 three-AZ design is simply wrong in a two-AZ Region, and a residency
+constraint cannot be checked against a Region nobody chose. Designing before
+that decision is legitimate; recording it as validated is not. Pass
+`--allow-region-placeholder` to defer deliberately, which downgrades it to
+`recommended`; the header warning stays either way.
+
+The placeholder is a real, plannable Region carried in a variable whose
+description holds a `REGION-PLACEHOLDER` sentinel — not a fake Region string.
+A fake string passes `terraform validate` and then fails `terraform plan` with
+*invalid AWS Region*, which would take down Stage 1 and leave you with no
+architecture at all instead of one with an open question.
 
 ## Install
 
@@ -71,6 +122,7 @@ skills/aws-solution-architect/scripts/validate.sh <terraform-dir> --tier 0
 | Stage | What it does | State |
 |---|---|---|
 | 1 | `terraform validate` + plan + plan.json | working |
+| 1b | Region resolution + diagram rendering | working |
 | 2 | Conftest/OPA against 17 policies; Checkov; Trivy | working (OPA); Checkov/Trivy untested |
 | 3 | IAM Access Analyzer custom policy checks | **never executed** |
 | 4 | Tier-aware zero-downtime invariants | working |

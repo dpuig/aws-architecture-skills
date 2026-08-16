@@ -42,6 +42,12 @@ produces carpet-bombed architectures that are unusable, which is the more common
 failure of this system than under-protection.
 Record unresolved fields as explicit assumptions; never silently default them.
 
+**If no Region is specified, do not stop and do not pick one silently.** Ask for
+it in the batched question set; if it is still unanswered, proceed with the
+labelled placeholder from `intake-schema.md`, record the assumption, and tell
+the user in your reply — not only in the deliverable. The gate stays shut on
+`INTAKE-REGION` until a Region is chosen or the user defers deliberately.
+
 **2. Determine the applicable control set.**
 Read `references/tier-model.md` to convert criticality into obligation.
 Then read the domain catalogs — the index first, and only the domain files the
@@ -75,6 +81,16 @@ Build from `assets/terraform/` modules in the domain skills. Write new resources
 only where no module fits, and say so explicitly per resource. Module provenance
 appears in the deliverable: composed modules and hand-written resources are
 listed separately, because they carry different assurance.
+
+**4b. Render the architecture diagram.**
+`validate.sh` writes `architecture.mmd` and `architecture.txt` at Stage 1b by
+projecting `plan.json`. Both go into deliverable §3 — see
+`references/diagrams.md`.
+**Never hand-draw the primary diagram.** A diagram generated from the validated
+plan cannot drift from the Terraform; one drawn from intent is an unverified
+claim sitting in the most trusted position in the document. Anything real but
+absent from the Terraform — on-prem, SaaS, an existing TGW — belongs in a
+separate diagram labelled as hand-drawn.
 
 **5. Validate and repair.**
 Run `scripts/validate.sh`. It emits JSON keyed by control ID.
@@ -115,6 +131,9 @@ restated public documentation.
 - **A control with `check: null` can never reach `satisfied`.** It is advice.
 - **Controls deliberately not applied are listed with the reason.**
 - **Never renumber a control ID.** IDs appear in customer-facing output.
+- **Never present a hand-drawn diagram as the generated one**, and never render
+  a placeholder Region as a bare Region name. Both put an unverified claim where
+  a reader has no way to detect it.
 - **Do not execute generated IaC.** This skill generates and validates; it does
   not apply. `terraform plan` runs with `-backend=false` and no credentials.
   Applying is a separate, human-gated decision.
