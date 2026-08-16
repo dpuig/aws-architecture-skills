@@ -2,7 +2,7 @@
   "name": "aws-architecture-skills",
   "description": "Zero Trust and zero-downtime AWS architecture skills with a deterministic validation gate.",
   "owner": {
-    "name": "TODO: your name or organisation"
+    "name": "Daniel Puig"
   },
   "metadata": {
     "pluginRoot": "./plugins"
