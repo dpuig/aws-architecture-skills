@@ -1,0 +1,23 @@
+# Terraform working state — provider binaries are ~650MB per fixture directory.
+# `terraform init` regenerates all of this; none of it belongs in the repo.
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+tf.plan
+*.tfstate
+*.tfstate.*
+
+# Validator output
+artifacts/
+validation.json
+
+# Retrieval index — rebuild with `kb_search.py --build-index`
+knowledge-base/.kb-index.json
+
+# Python
+__pycache__/
+*.pyc
+
+# Retrieval corpus — per-installation, never committed.
+# This is the one genuinely proprietary part of the system.
+knowledge-base/curated/

@@ -1,0 +1,465 @@
+# ZT-NET candidate control records — Phase 1.2 output
+#
+# STATUS: pending-review. Nothing here is catalog content until a human works
+# through Phase 1.3 and promotes it into
+#       plugins/aws-architecture/skills/aws-zero-trust/references/network.md.
+#
+# Conforms to plugins/aws-architecture/skills/aws-solution-architect/references/control-record-schema.md.
+#
+# ⚠️  EVERY RECORD HAS `kb_source: null`.
+#     No curated house KB exists in this repo yet, so nothing can express a
+#     house position. By the schema's own health metric these are all
+#     "uncurated" — sourced entirely from public AWS documentation. See
+#     BLOCKER at the end of this file; this is the single most important
+#     finding of the pilot.
+
+catalog_version: 0.1
+domain: network
+generated: 2026-08-15
+extraction_pass: 1
+source_manifest: ../sources/manifest.yaml
+
+controls:
+
+  - id: ZT-NET-001
+    title: Network layers are defined by trust boundary, not by convenience
+    domain: network
+    tier: required
+    applies_when: "Any workload deploying VPC-attached resources"
+    applies_to_criticality: [0, 1, 2]
+    waf_bp: [SEC05-BP01]
+    rationale: >
+      Grouping resources by shared sensitivity and reachability is what makes
+      every later control expressible. Without layers there is no "private
+      tier" for a rule to refer to, and segmentation degrades into per-resource
+      exceptions that no one can audit.
+    aws_implementation: |
+      - Subnets grouped into named tiers (edge / application / data) with tier
+        recorded as a resource tag, not inferred from CIDR or subnet name.
+      - Each tier has a distinct route table; data-tier route tables have no
+        route to an internet gateway.
+      - Resources inherit tier from subnet placement; no resource spans tiers.
+    kb_source: null
+    authority: SRC-AWS-WAF-SEC#SEC05-BP01
+    check: null                      # needs bespoke Rego — tier tagging is house convention
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: high
+    exceptions: []
+
+  - id: ZT-NET-002
+    title: IP address space is centrally allocated and non-overlapping
+    domain: network
+    tier: required
+    applies_when: "Any multi-VPC or multi-account deployment"
+    applies_to_criticality: [0, 1]
+    rationale: >
+      Overlapping CIDRs foreclose future connectivity options and force NAT
+      workarounds that obscure traffic origin — which in turn defeats
+      identity-based ingress rules that depend on knowing the true source.
+      The cost is paid years after the mistake, by a different team.
+    aws_implementation: |
+      - CIDRs allocated from an Amazon VPC IPAM pool, not hand-picked.
+      - Distinct CIDR ranges reserved for on-premises versus cloud.
+      - Hierarchical allocation by Region and business unit to permit
+        route summarization.
+      - Deliberate overlap (isolated workloads) requires an exception record.
+    kb_source: null
+    authority: SRC-AWS-MULTIVPC#ip-address-planning-and-management
+    check: null
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: high
+    exceptions:
+      - condition: "Isolated or disconnected workload with no current or planned peering"
+        requires: "Documented approval; overlap recorded in IPAM"
+
+  - id: ZT-NET-003
+    title: Internet egress is centralized and inspected
+    domain: network
+    tier: required
+    applies_when: "Any VPC whose workloads initiate outbound internet traffic"
+    applies_to_criticality: [0, 1]
+    rationale: >
+      Uninspected egress is the exfiltration path and the command-and-control
+      path. Centralizing it is not primarily a cost measure — it is what makes
+      a single inspection policy enforceable instead of per-VPC and drifting.
+    aws_implementation: |
+      - Egress routed through a shared inspection VPC via Transit Gateway.
+      - AWS Network Firewall or Gateway Load Balancer appliance in the path.
+      - Workload VPCs have no internet gateway of their own.
+      - NAT gateways live only in the egress VPC.
+    kb_source: null
+    authority: SRC-AWS-MULTIVPC#welcome
+    check: null
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: high
+    exceptions:
+      - condition: "Latency-sensitive workload with documented throughput requirement"
+        requires: "Compensating control ZT-NET-012 (inspection at the workload VPC)"
+
+  - id: ZT-NET-004
+    title: Traffic between network layers is explicitly authorized
+    domain: network
+    tier: required
+    applies_when: "Any workload with more than one network tier"
+    applies_to_criticality: [0, 1, 2]
+    waf_bp: [SEC05-BP02]
+    rationale: >
+      Perimeter-only trust fails the moment one host inside the perimeter is
+      compromised. Controlling flow between layers converts a single breach
+      into a contained one.
+    aws_implementation: |
+      - Security group ingress references peer security group IDs for
+        east-west traffic; CIDR-based rules only at the edge tier.
+      - Each cross-tier flow is a named, single-purpose rule.
+      - Default-deny between tiers; no "allow all from VPC CIDR" rules.
+    kb_source: null
+    authority: SRC-AWS-WAF-SEC#SEC05-BP02
+    check: null
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: high
+    exceptions: []
+
+  - id: ZT-NET-005
+    title: Service-to-service reachability requires explicit service network association
+    domain: network
+    tier: recommended
+    applies_when: "Workloads using VPC Lattice for service-to-service communication"
+    applies_to_criticality: [0, 1]
+    rationale: >
+      This is the first of VPC Lattice's four defense layers. Association is
+      the reachability decision itself — absent an association or a service
+      network VPC endpoint, a client cannot reach the service at all,
+      regardless of any policy above it.
+    aws_implementation: |
+      - Clients reach services only via VPC-to-service-network association or
+        a VPC endpoint of type `service network`.
+      - Association is granted per client VPC, never organization-wide.
+    kb_source: null
+    authority: SRC-AWS-LATTICE#vpc-service-network-features
+    check: null
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: high
+    exceptions: []
+
+  - id: ZT-NET-006
+    title: Security groups are applied to VPC–service network associations
+    domain: network
+    tier: recommended
+    applies_when: "Workloads using VPC Lattice service networks"
+    applies_to_criticality: [0, 1]
+    rationale: >
+      Lattice's second defense layer. Without it, association grants network
+      reachability to every client in the associated VPC, and the auth policy
+      becomes the sole control — a single layer, contrary to defense in depth.
+    aws_implementation: |
+      - Security groups attached to the VPC–service network association.
+      - Rules reference client security group IDs, not VPC CIDR.
+    kb_source: null
+    authority: SRC-AWS-LATTICE#vpc-service-network-features
+    check: null
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: high
+    exceptions: []
+
+  - id: ZT-NET-007
+    title: Service networks carry a coarse-grained auth policy
+    domain: network
+    tier: recommended
+    applies_when: "Workloads using VPC Lattice service networks"
+    applies_to_criticality: [0, 1]
+    rationale: >
+      Lattice's third layer, owned by the network administrator rather than the
+      service team. It sets the floor that individual service owners cannot
+      accidentally drop below — the separation of duties is the point.
+    aws_implementation: |
+      - Auth policy attached at the service network, set by the service
+        network owner.
+      - Policy asserts authenticated principals only; anonymous access denied.
+      - Note: service network auth policies do NOT apply to resource
+        configurations. Resources need separate treatment.
+    kb_source: null
+    authority: SRC-AWS-LATTICE#vpc-service-network-components-overview
+    check: null
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: high
+    exceptions: []
+
+  - id: ZT-NET-008
+    title: Individual services carry a fine-grained auth policy
+    domain: network
+    tier: recommended
+    applies_when: "Workloads using VPC Lattice services"
+    applies_to_criticality: [0, 1]
+    rationale: >
+      Lattice's fourth layer. The service owner knows which callers are
+      legitimate; the network owner does not. Pushing fine-grained
+      authorization to the service is what makes per-identity access decisions
+      accurate rather than nominal.
+    aws_implementation: |
+      - Auth policy on each service naming permitted principals and actions.
+      - Policies identify callers by IAM principal, not by source IP.
+    kb_source: null
+    authority: SRC-AWS-LATTICE#vpc-service-network-components-overview
+    check: null
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: high
+    exceptions:
+      - condition: "Service is internal-only and the service network policy is provably equivalent"
+        requires: "Recorded equivalence review; re-checked on any service network policy change"
+
+  - id: ZT-NET-009
+    title: Application access is evaluated per request, not per session
+    domain: network
+    tier: required
+    applies_when: "Any workload exposing applications to human users"
+    applies_to_criticality: [0, 1]
+    rationale: >
+      A traditional model evaluates access once and then grants broad reach,
+      which is what lets an attacker move laterally between applications after
+      a single successful authentication. Per-request evaluation makes that
+      movement expensive.
+    aws_implementation: |
+      - AWS Verified Access in front of applications, replacing VPN-based
+        network-level admission.
+      - Trust providers integrated for both identity and device signals.
+      - All access attempts logged centrally.
+    kb_source: null
+    authority: SRC-AWS-VERIFIED-ACCESS#feature-overview
+    check: null
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: medium
+    review_note: >
+      Overview page states the principle but carries no testable configuration
+      detail. Fetch the policy-syntax and trust-provider pages before this
+      record stays at `required`; as written the authority anchor is thin.
+    exceptions: []
+
+  - id: ZT-NET-010
+    title: AWS service access uses VPC endpoints rather than internet egress
+    domain: network
+    tier: required
+    applies_when: "Any VPC-attached workload calling AWS service APIs"
+    applies_to_criticality: [0, 1]
+    rationale: >
+      Routing API calls over the internet widens the egress path that
+      ZT-NET-003 exists to narrow, and makes service traffic
+      indistinguishable from general outbound traffic at the inspection point.
+    aws_implementation: |
+      - Interface endpoints (PrivateLink) for the AWS services in use.
+      - Gateway endpoints for S3 and DynamoDB.
+      - Endpoint policies restrict which principals and resources may be
+        reached through the endpoint.
+    kb_source: null
+    authority: SRC-AWS-MULTIVPC#welcome
+    check: null
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: high
+    exceptions: []
+
+  - id: ZT-NET-012
+    title: Inspection-based protection is deployed in the traffic path
+    domain: network
+    tier: recommended
+    applies_when: "Workloads handling untrusted input or regulated data"
+    applies_to_criticality: [0, 1]
+    waf_bp: [SEC05-BP03]
+    rationale: >
+      Flow controls decide whether a connection is permitted; inspection
+      decides whether its contents are acceptable. Identity-based ingress
+      cannot detect a malicious payload from a legitimately authorized caller.
+    aws_implementation: |
+      - AWS Network Firewall for VPC-level inspection.
+      - AWS WAF on ALB / CloudFront / API Gateway for HTTP-layer inspection.
+      - Gateway Load Balancer where a third-party appliance is required.
+    kb_source: null
+    authority: SRC-AWS-WAF-SEC#SEC05-BP03
+    check: null
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: medium
+    exceptions: []
+
+  - id: ZT-NET-013
+    title: Network protection is applied by automation, not by hand
+    domain: network
+    tier: required
+    applies_when: "Any workload with more than one environment or account"
+    applies_to_criticality: [0, 1]
+    waf_bp: [SEC05-BP04]
+    rationale: >
+      Hand-applied network controls drift, and drift is invisible until an
+      incident surfaces it. Automation is what makes the control's state at any
+      later date knowable rather than assumed.
+    aws_implementation: |
+      - All network resources defined in IaC; console changes treated as drift.
+      - AWS Firewall Manager for organization-wide rule enforcement.
+      - Drift detection alerting on out-of-band change.
+    kb_source: null
+    authority: SRC-AWS-WAF-SEC#SEC05-BP04
+    check: null
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: high
+    exceptions: []
+
+  - id: ZT-NET-014
+    title: Private-tier subnets deny unrestricted ingress
+    domain: network
+    tier: required
+    applies_when: "Any VPC-attached compute not explicitly designated an edge tier"
+    applies_to_criticality: [0, 1]
+    waf_bp: [SEC05-BP02]
+    rationale: >
+      Perimeter-only trust fails the moment one edge host is compromised.
+      Ingress must be authorized per-source-identity, not per-network-location.
+    aws_implementation: |
+      - Security group ingress references peer SG IDs, never CIDR blocks, for
+        east-west traffic.
+      - Public exposure terminates at ALB/CloudFront; origin protected by
+        VPC origin or SG referencing the managed prefix list.
+      - No 0.0.0.0/0 ingress on any private-tier security group.
+    kb_source: null
+    authority: SRC-AWS-WAF-SEC#SEC05-BP02
+    check: policies/opa/zt-net-014.rego      # to be written; see check reuse note
+    partial_upstream_checks: [CKV_AWS_24, CKV_AWS_25]
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: high
+    review_note: >
+      Upstream Checkov rules cover only ports 22 and 3389. They are a useful
+      floor but do not satisfy this control, which asserts the general case.
+      Bespoke Rego required — do not mark satisfied on Checkov alone.
+    exceptions:
+      - condition: "Documented public-facing NLB for non-HTTP protocol"
+        requires: "Compensating control ZT-NET-021 (Network Firewall inspection)"
+
+  - id: ZT-NET-015
+    title: Subnets do not auto-assign public IP addresses
+    domain: network
+    tier: required
+    applies_when: "Any subnet outside a designated edge tier"
+    applies_to_criticality: [0, 1, 2]
+    rationale: >
+      Auto-assignment makes public exposure the default outcome of a routine
+      launch. The failure is silent: nothing errors, and the instance is simply
+      reachable. Defaults decide outcomes far more often than policies do.
+    aws_implementation: |
+      - `map_public_ip_on_launch = false` on all non-edge subnets.
+      - Edge-tier subnets requiring public IPs are explicitly tagged as such.
+    kb_source: null
+    authority: SRC-AWS-WAF-SEC#SEC05-BP01
+    check: CKV_AWS_130               # upstream rule, exact match — no bespoke policy needed
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: high
+    exceptions: []
+
+  - id: ZT-NET-016
+    title: Every security group rule carries a description
+    domain: network
+    tier: recommended
+    applies_when: "Any security group"
+    applies_to_criticality: [0, 1, 2]
+    rationale: >
+      An undescribed rule cannot be safely removed, because no one knows what
+      breaks. Rule sets therefore only ever grow. The description is what makes
+      least privilege maintainable over years rather than achievable once.
+    aws_implementation: |
+      - Every ingress and egress rule has a description naming the calling
+        system and the reason for the flow.
+    kb_source: null
+    authority: SRC-AWS-WAF-SEC#SEC05-BP04
+    check: CKV_AWS_23
+    iac_ref: null
+    last_reviewed: 2026-08-15
+    review_owner: "@unassigned"
+    extraction_confidence: medium
+    review_note: >
+      Authority anchor is weak — SEC05-BP04 is about automation generally, not
+      rule documentation specifically. The rationale is sound and operational
+      but this is closer to a house convention than a documented AWS
+      requirement. A strong candidate for demotion to `contextual`, or for
+      being the first record to gain a real `kb_source`.
+    exceptions: []
+
+# ---------------------------------------------------------------------------
+# Reserved / not extracted
+# ---------------------------------------------------------------------------
+# ZT-NET-011  reserved — private DNS resolution. Source material (SRC-AWS-MULTIVPC
+#             DNS section) not yet fetched; ID held so numbering stays stable.
+# ZT-NET-021  referenced by ZT-NET-014's exception (Network Firewall inspection).
+#             MUST be authored before ZT-NET-014 is promoted — schema rule 5
+#             requires exceptions[].requires to name a real control.
+
+# ---------------------------------------------------------------------------
+# Pilot metrics — the numbers Phase 1 exists to produce
+# ---------------------------------------------------------------------------
+metrics:
+  records_extracted: 15
+  sources_mined: 5
+  yield_ratio: "~1 control per source section; below the plan's 1-per-200-400-words
+    estimate because AWS overview pages are far less dense than curated prose"
+
+  check_coverage:
+    exact_upstream_reuse: 2          # ZT-NET-015, ZT-NET-016
+    partial_upstream: 1              # ZT-NET-014
+    bespoke_rego_required: 12
+    percent_enforceable_today: 13
+    finding: >
+      This is the health metric the plan calls the most useful one, and the
+      first pass returns a poor number. Only 2 of 15 controls can be checked
+      with an existing upstream rule. The rest are architectural assertions
+      (tiering, centralized egress, per-request evaluation) that no generic
+      linter expresses. Expect Phase 3 to be larger than the plan's Week 2-3
+      allocation, or expect most of this catalog to sit at `recommended`
+      rather than `satisfied`.
+
+  authority_coverage: "15/15 — every record cites a verified N-marked source"
+  kb_source_coverage: "0/15 — see BLOCKER"
+
+# ---------------------------------------------------------------------------
+# BLOCKER — read before extending to further domains
+# ---------------------------------------------------------------------------
+blocker:
+  issue: "No curated knowledge base exists in this repository."
+  detail: >
+    The plan's premise is output "grounded in your curated knowledge base
+    rather than model recall", and the schema's `kb_source` field points at a
+    `kb://` namespace holding your house position. That corpus is not present
+    here. Every record in this file therefore derives entirely from public AWS
+    documentation.
+  consequence: >
+    A catalog built only from public sources encodes generic best practice. The
+    plan's Phase 4 warns that a small delta against a no-skill baseline is
+    almost always this exact problem — and at 0/15 kb_source coverage, that
+    delta would be small by construction, because a capable model can already
+    recall the SEC05 best practices these records restate.
+  resolution_required: >
+    Point Phase 1 at the actual curated KB before extracting further domains.
+    If no such corpus exists yet in written form, that is the real Phase 1
+    input and it needs to be produced first — extraction cannot distill what
+    was never written down.

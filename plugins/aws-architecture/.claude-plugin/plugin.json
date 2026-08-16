@@ -1,0 +1,19 @@
+{
+  "name": "aws-architecture",
+  "displayName": "AWS Zero Trust / Zero Downtime Architecture",
+  "version": "0.1.0",
+  "description": "Turns a solution concept into a validated AWS architecture: Terraform plus a traceable control-coverage matrix, backed by a 96-control catalog and a deterministic validation gate.",
+  "keywords": [
+    "aws",
+    "terraform",
+    "zero-trust",
+    "reliability",
+    "security",
+    "architecture",
+    "policy-as-code",
+    "opa",
+    "conftest"
+  ],
+  "license": "Apache-2.0",
+  "skills": ["./skills/"]
+}

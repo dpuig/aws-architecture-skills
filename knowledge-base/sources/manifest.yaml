@@ -1,0 +1,156 @@
+# Source fetch manifest — Phase 1.2 Inventory
+# Records what was retrieved, when, and what it yielded.
+# Content is NOT mirrored; see ../README.md#license-disposition.
+
+manifest_version: 1
+generated: 2026-08-15
+scope: network pilot (ZT-NET)
+
+sources:
+
+  - id: SRC-AWS-MULTIVPC
+    url: https://docs.aws.amazon.com/whitepapers/latest/building-scalable-secure-multi-vpc-network-infrastructure/welcome.html
+    title: Building a Scalable and Secure Multi-VPC AWS Network Infrastructure
+    publication_date: 2024-04-17        # stated on page
+    fetched: 2026-08-15
+    status: verified
+    license: aws-copyright
+    yielded: [ZT-NET-002, ZT-NET-003, ZT-NET-010, ZT-NET-011]
+    notes: >
+      Confirms Control Tower OU model (relevant to plan open decision #3).
+      Control-dense material on centralized egress and IPAM. Connectivity
+      guidance dominates; segmentation controls are thinner than expected.
+
+  - id: SRC-AWS-LATTICE
+    url: https://docs.aws.amazon.com/vpc-lattice/latest/ug/what-is-vpc-lattice.html
+    title: What is Amazon VPC Lattice?
+    publication_date: null              # continuously updated service doc
+    fetched: 2026-08-15
+    status: verified
+    license: aws-copyright
+    yielded: [ZT-NET-005, ZT-NET-006, ZT-NET-007, ZT-NET-008]
+    notes: >
+      Highest-yield source of the pilot. States an explicit four-layer defense
+      model (association / security groups / service-network auth policy /
+      service auth policy) that maps 1:1 onto four separable controls.
+      Also documents AZ affinity — cross-references ZD-TOP.
+
+  - id: SRC-AWS-VERIFIED-ACCESS
+    url: https://docs.aws.amazon.com/verified-access/latest/ug/what-is-verified-access.html
+    title: What is AWS Verified Access?
+    publication_date: null
+    fetched: 2026-08-15
+    status: verified
+    license: aws-copyright
+    yielded: [ZT-NET-009]
+    notes: >
+      States per-request evaluation explicitly and contrasts it with
+      evaluate-once VPN models — good rationale material for the ZT premise.
+      Overview page is thin on testable configuration detail; policy-syntax
+      pages need a follow-up fetch before ZT-NET-009 can reach `required`.
+
+  - id: SRC-AWS-WAF-SEC
+    url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/welcome.html
+    title: Security Pillar - AWS Well-Architected Framework
+    publication_date: 2024-11-06        # stated on page
+    fetched: 2026-08-15
+    status: verified
+    license: aws-copyright
+    yielded: [ZT-NET-001, ZT-NET-004, ZT-NET-012, ZT-NET-013]
+    subpages_fetched:
+      - infrastructure-protection.html
+      - protecting-networks.html
+    notes: >
+      Confirms the SEC05-BP01..BP04 identifiers used as the secondary key on
+      every ZT-NET record. Section text explicitly frames network protection in
+      Zero Trust terms, which strengthens the authority chain.
+
+  - id: SRC-CHECKOV
+    url: https://www.checkov.io/5.Policy%20Index/terraform.html
+    title: Checkov Terraform Policy Index
+    fetched: 2026-08-15
+    status: verified
+    license: apache-2.0
+    yielded_checks:
+      CKV_AWS_23: Ensure every security group and rule has a description
+      CKV_AWS_24: Ensure no security groups allow ingress from 0.0.0.0:0 to port 22
+      CKV_AWS_25: Ensure no security groups allow ingress from 0.0.0.0:0 to port 3389
+      CKV_AWS_130: Ensure VPC subnets do not assign public IP by default
+      CKV_AWS_229: Ensure no NACL allow ingress from 0.0.0.0:0 to port 21
+      CKV_AWS_230: Ensure no NACL allow ingress from 0.0.0.0:0 to port 20
+    notes: >
+      Reusable checks are narrower than expected — port-specific (22, 3389)
+      rather than general. The catalog's broader ingress controls still need
+      bespoke Rego. See "Check reuse rate" in the candidates file.
+
+  - id: SRC-AWS-FIB
+    url: https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/abstract-and-introduction.html
+    title: AWS Fault Isolation Boundaries
+    fetched: null                        # confirmed via search, not fetched
+    status: verified
+    license: aws-copyright
+    yielded: [ZD-TOP-001]
+    notes: Verified via search. Anchors the Stage 4 AZ-spread invariant.
+
+  - id: SRC-AWS-STATIC-STAB
+    url: https://aws.amazon.com/builders-library/static-stability-using-availability-zones/
+    title: Static stability using Availability Zones
+    authors: [Becky Weiss, Mike Furr]
+    fetched: 2026-08-15
+    status: verified
+    license: aws-copyright
+    yielded: [ZD-TOP-003, ZD-TOP-005]
+    notes: >
+      Registered as rationale-only (R) but states a testable requirement —
+      overprovision 50% across three AZs so each runs at 66% of load-tested
+      capacity — so promoted to N. Also the clearest statement of the EC2 data
+      plane's own static stability, which is what ZD-TOP-005 relies on.
+
+  - id: SRC-AWS-MULTIREGION
+    url: https://docs.aws.amazon.com/prescriptive-guidance/latest/aws-multi-region-fundamentals/introduction.html
+    url_superseded: https://docs.aws.amazon.com/whitepapers/latest/aws-multi-region-fundamentals/
+    title: AWS Multi-Region Fundamentals
+    fetched: 2026-08-15
+    status: verified
+    license: aws-copyright
+    yielded: [ZD-TOP-010]
+    notes: >
+      ⚠️ RELOCATED. The registered whitepapers/ URL is now marked ARCHIVED; the
+      maintained version moved to prescriptive-guidance/. The register had been
+      anchoring a `required` control on the archived copy.
+      Highest-value extracted requirement: asynchronous replication leaves
+      uncommitted writes at failover, and the reconciliation process is specific
+      business logic the datastore does not provide.
+
+  - id: SRC-AWS-SRA
+    url: https://docs.aws.amazon.com/prescriptive-guidance/latest/security-reference-architecture/welcome.html
+    title: AWS Security Reference Architecture
+    fetched: null
+    status: verified
+    license: aws-copyright
+    yielded: []
+    notes: Verified via search (updated through Dec 2025). Not yet mined.
+
+  - id: SRC-AWS-ZT-COMP
+    url: https://docs.aws.amazon.com/prescriptive-guidance/latest/strategy-zero-trust-architecture/components.html
+    title: "AWS PG: Key components of a zero trust architecture"
+    fetched: null
+    status: verified
+    license: aws-copyright
+    yielded: []
+    notes: Verified via search. Candidate authority for ZT-NET-005 pending fetch.
+
+# ---------------------------------------------------------------------------
+# Not yet fetched. Sources remain `unverified` in kb-sources.md until confirmed.
+# ---------------------------------------------------------------------------
+pending:
+  - SRC-AWS-IAM-BP
+  - SRC-AWS-SECHUB-CTRL      # highest priority: best extraction seed in register
+  - SRC-AWS-CONFIG-RULES
+  - SRC-TRIVY
+  - SRC-GUARD-REGISTRY
+  - SRC-CDK-NAG
+  - SRC-AWS-AA-CUSTOM
+  - SRC-NIST-207             # public domain; safe to mirror if wanted
+  - SRC-NIST-1800-35
+  - SRC-CISA-ZTMM

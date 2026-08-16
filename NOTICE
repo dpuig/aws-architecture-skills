@@ -1,0 +1,68 @@
+AWS Zero Trust / Zero Downtime Architecture Skills
+Copyright <YEAR> <COPYRIGHT HOLDER>
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+================================================================================
+NO AFFILIATION WITH AMAZON WEB SERVICES
+================================================================================
+
+This project is not affiliated with, endorsed by, sponsored by, or approved by
+Amazon Web Services, Inc. or its affiliates.
+
+"AWS", "Amazon Web Services", and the names of AWS services are trademarks of
+Amazon.com, Inc. or its affiliates. They are used here nominatively, to identify
+the services the guidance applies to.
+
+The control catalog cites AWS documentation by identifier (for example,
+"SRC-AWS-WAF-SEC#SEC05-BP01"). Those citations indicate the source that informed
+a control. They do NOT indicate that AWS has reviewed, approved, or agrees with
+the control as written.
+
+================================================================================
+THIRD-PARTY MATERIAL
+================================================================================
+
+AWS documentation and whitepapers
+  Copyright Amazon.com, Inc. or its affiliates. All rights reserved.
+  Cited by URL and section anchor. Control prose in this repository is original
+  writing, not reproduction. No AWS documentation text is redistributed here.
+
+NIST Special Publications (800-53, 800-57, 800-63, 800-207, 1800-35)
+  United States Government work, public domain.
+  Registered in the source register; not currently reproduced.
+
+CIS Benchmarks
+  Copyright Center for Internet Security. Redistribution is restricted under
+  CIS terms. This repository cites the benchmark by version and control number
+  only. No CIS control text is reproduced. If you extend this catalog, do not
+  paste CIS text into it.
+
+Google SRE Workbook
+  Licensed CC BY-NC-ND 4.0. Cited only; no derivative text.
+
+"Evolutionary Database Design" (Martin Fowler, Pramod Sadalage)
+  Cited as the source for the expand/contract pattern (ZD-DAT-006). No text
+  reproduced.
+
+"Release It!" (Michael Nygard)
+  Cited for circuit breaker and bulkhead patterns. No text reproduced, and it
+  is never used as a control's authority anchor because a reader cannot follow
+  a citation to a printed book.
+
+================================================================================
+WARRANTY DISCLAIMER — READ BEFORE PRODUCTION USE
+================================================================================
+
+This software generates and validates infrastructure-as-code. It does not apply
+it, and it must not be treated as a substitute for security review, architecture
+review, or professional judgement.
+
+The catalog is version 0.1.0 and has NOT been through human review. Roughly half
+its controls cite an AWS best-practice page that was not read during authoring;
+the requirement text in those cases is the authors' synthesis. See
+VERIFICATION.md for a measured account.
+
+A "satisfied" control means a check passed or a vetted module was composed. It
+does not mean the resulting architecture is secure, available, or compliant with
+any regulation.
