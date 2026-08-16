@@ -113,6 +113,26 @@ Missing optional tools do not silently degrade the result: affected controls
 report `skipped` and the validator will not return 0. That is deliberate, and
 it means **a fresh install without the optional tools never exits clean.**
 
+**You do not have to remember to run it.** `aws-solution-architect` runs
+`preflight.sh --json` as a precondition and reports what is missing *before* it
+starts designing — with what each tool would have verified and the command to
+install it. The timing is the point: a missing binary costs one `brew install`
+at intake and a wasted design cycle at validation.
+
+Nothing required missing → it says nothing. Optional tools missing → it names
+them and their consequence, then continues. A **required** tool missing → it
+stops, because the validator cannot run and nothing it produced could honestly
+be called validated.
+
+```sh
+plugins/aws-architecture/scripts/preflight.sh --json
+```
+
+Emits `status` (`ok` | `degraded` | `fail`), `required_missing`,
+`optional_missing`, `kb_root`, and a `consequence` string — each missing entry
+carrying `bin`, `why`, and `install`, so the report is always actionable. Exit 1
+when a required tool is absent.
+
 ## The validator
 
 ```sh

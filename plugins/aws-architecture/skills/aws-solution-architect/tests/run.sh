@@ -219,6 +219,68 @@ fi
 python3 "${RENDER}" "${WORK}/does-not-exist.json" >/dev/null 2>&1
 check "missing plan exits 2" "$?" "2"
 
+# ---------------------------------------------------------------------------
+# Toolchain preflight
+# ---------------------------------------------------------------------------
+# The skill reads --json at intake to tell the user which binaries are missing
+# and what each one costs them. That is a contract: if the shape changes, the
+# user silently stops being told, which is worse than never having told them.
+echo "── preflight"
+
+PREFLIGHT="${SCRIPT_DIR}/../../../scripts/preflight.sh"
+check "preflight present" "$([[ -f "${PREFLIGHT}" ]] && echo yes || echo no)" yes
+
+if [[ -f "${PREFLIGHT}" ]]; then
+  PF_JSON="$(bash "${PREFLIGHT}" --json 2>/dev/null)"
+  check "json parses" \
+    "$(printf '%s' "${PF_JSON}" | python3 -c 'import json,sys; json.load(sys.stdin); print("yes")' 2>/dev/null || echo no)" yes
+  check "json has contract keys" \
+    "$(printf '%s' "${PF_JSON}" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+want = {"status", "present", "required_missing", "optional_missing", "kb_root", "consequence"}
+print("all" if want <= set(d) else f"missing={sorted(want - set(d))}")
+' 2>/dev/null || echo error)" all
+  check "status is a known value" \
+    "$(printf '%s' "${PF_JSON}" | python3 -c '
+import json, sys
+print(json.load(sys.stdin)["status"] in ("ok", "degraded", "fail"))
+' 2>/dev/null)" True
+
+  # Every missing-tool entry must carry the fix. A report the user cannot act on
+  # is the failure mode this whole notification exists to avoid.
+  check "missing entries carry install" \
+    "$(printf '%s' "${PF_JSON}" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+rows = d["required_missing"] + d["optional_missing"]
+bad = [r for r in rows if not (r.get("bin") and r.get("why") and r.get("install"))]
+print("complete" if not bad else f"incomplete={bad}")
+' 2>/dev/null)" complete
+
+  # Regression guard: two install hints contain a '|' of their own (command *or*
+  # URL). An unbounded field split shifts every value one position left, which
+  # previously produced entries whose "bin" was a sentence.
+  # bash and python3 are invoked by absolute path: the PATH override is meant to
+  # hide terraform and conftest from preflight, not to stop the test harness
+  # from finding its own interpreter.
+  STUB="${WORK}/stub-path"
+  mkdir -p "${STUB}"
+  BASH_BIN="$(command -v bash)"
+  PY_BIN="$(command -v python3)"
+  ln -sf "${PY_BIN}" "${STUB}/python3" 2>/dev/null
+  check "required-missing exits 1" \
+    "$(PATH="${STUB}" "${BASH_BIN}" "${PREFLIGHT}" --json >/dev/null 2>&1; echo $?)" 1
+  check "install hint keeps its pipe" \
+    "$(PATH="${STUB}" "${BASH_BIN}" "${PREFLIGHT}" --json 2>/dev/null | "${PY_BIN}" -c '
+import json, sys
+d = json.load(sys.stdin)
+tf = [r for r in d["required_missing"] if r["bin"] == "terraform"]
+print("intact" if tf and tf[0]["install"].startswith("brew install terraform")
+      and "https://" in tf[0]["install"] else f"mangled={tf}")
+' 2>/dev/null)" intact
+fi
+
 echo
 if [[ ${FAILURES} -eq 0 ]]; then
   echo "PASS — all assertions met"

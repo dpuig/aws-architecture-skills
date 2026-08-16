@@ -26,12 +26,40 @@ backed by nothing is the specific failure this system exists to prevent.
 
 | Requirement | How to check | If missing |
 |---|---|---|
+| Validator toolchain | `../../scripts/preflight.sh --json` | **Tell the user before designing anything** — see below. Continue only if nothing required is missing. |
 | A promoted control catalog | `aws-zero-trust/references/control-catalog.md` exists | Report which domains are unavailable. Offer to run against candidate records in `knowledge-base/extracted/`, clearly labelled as unreviewed. |
 | Catalog version | Read `catalog_version` from the catalog header | Record it in the deliverable. Never emit output without one. |
 | Retrieval corpus | `scripts/kb_search.py --status` exits 0 | Continue, but every claim not covered by a catalog control is `UNGROUNDED`. |
 
 State the catalog version and any degraded preconditions in the deliverable
 header. The reader must be able to tell what the output was actually built from.
+
+### Reporting the toolchain to the user
+
+Run the preflight **first**, and report what it finds *in your reply to the
+user*, not only in the deliverable header. The timing is the whole point: a
+missing tool costs one `brew install` at intake and a wasted design cycle at
+validation, and the person who can fix it is reading your reply.
+
+`preflight.sh --json` returns `status`, `required_missing`, `optional_missing`,
+`kb_root`, and a `consequence` string. Act on `status`:
+
+| `status` | What it means | What to do |
+|---|---|---|
+| `ok` | Full toolchain | Say nothing. Do not congratulate the user on their PATH. |
+| `degraded` | Optional tools absent | Design normally, but tell the user **before** you start: name each missing tool, what it would have verified, and its install command. Say plainly that the validator cannot return 0 until they are installed. |
+| `fail` | A required tool is absent | **Stop.** The validator cannot run, so nothing you produce can be reported as validated. Give the install commands and offer to continue on the explicit understanding that the output is unvalidated advice. |
+
+Report the tools, the consequence, and the fix together. "checkov not found" on
+its own is a fact the user cannot act on; "checkov is missing, so the baseline
+coverage controls will report `skipped` and block the gate — `pip install
+checkov`" is one they can. Never present a missing optional tool as a mere
+warning that can be ignored: a `skipped` control blocks exactly as a failure
+does, and that surprises people who were told it was optional.
+
+`kb_root: unset` is expected on a fresh install and is not a toolchain problem —
+mention it once, with its consequence (claims outside the catalog are marked
+`UNGROUNDED`), and do not repeat it every run.
 
 ## Workflow
 
