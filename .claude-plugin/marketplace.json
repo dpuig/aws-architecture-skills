@@ -9,7 +9,7 @@
       "name": "aws-architecture",
       "source": "./plugins/aws-architecture",
       "description": "Intake to validated AWS architecture: 96 controls with upstream citations, 17 executable OPA policies, and a staged validator that fails closed on unverified checks.",
-      "version": "0.1.0"
+      "version": "0.2.0"
     }
   ]
 }

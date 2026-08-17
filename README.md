@@ -5,11 +5,16 @@ architecture: Terraform plus a traceable control-coverage matrix, backed by a
 96-control catalog and a validation gate that **fails closed on anything it
 could not verify**.
 
-> **Status: v0.1.0, pre-review.** The catalog has not been through human
+> **Status: v0.2.0, pre-review.** The catalog has not been through human
 > sign-off, and roughly half its controls cite an AWS page that was never
 > opened during authoring. Read [VERIFICATION.md](VERIFICATION.md) before
 > relying on this for anything that matters — it is a measured account of what
 > has and has not been checked, including corrections to earlier claims.
+>
+> Tags are checkpoints, not releases. `v0.2.0` marks a coherent state of the
+> work; it does not assert that the catalog is reviewed. The plugin version and
+> `CATALOG_VERSION` are deliberately separate — the catalog is still at 0.1.0
+> because no control has changed since it was written.
 
 Not affiliated with, endorsed by, or sponsored by Amazon Web Services.
 See [NOTICE](NOTICE).
