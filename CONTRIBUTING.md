@@ -97,3 +97,23 @@ for s in plugins/aws-architecture/skills/*/tests/run.sh; do bash "$s" || exit 1;
 ```
 
 CI runs the same on every push and pull request.
+
+### Clean up before installing the plugin locally
+
+The suites run `terraform init` in every fixture directory, which leaves roughly
+**3.8 GB** of provider binaries in the working tree. That is gitignored, so it
+never reaches the repo — but `claude plugin install` from a directory source
+copies the *directory*, not the git tree, and `.gitignore` does not apply. A
+plugin cache that should be about 440 KB ends up in the gigabytes, once per
+installed version.
+
+Clean before installing:
+
+```sh
+find . -name .terraform -type d -prune -exec rm -rf {} +
+find . \( -name tf.plan -o -name .terraform.lock.hcl \) -delete
+find . -name __pycache__ -type d -prune -exec rm -rf {} +
+```
+
+The suites re-run `terraform init` themselves, so nothing is lost by deleting
+it.
